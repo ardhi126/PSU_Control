@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Power Supply Controller</title>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --bg-panel: #1e1e1e;
+            --border-color: #333;
+            --text-color: #f3f4f6;
+            --accent-color: #3b82f6;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            flex: 1;
+            height: 100%;
+        }
+
+        .panel {
+            background: var(--bg-panel);
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Layout Grid */
+        .col-left { width: 250px; border-right: 1px solid var(--border-color); }
+        .col-mid { flex: 1; display: flex; flex-direction: column; }
+        .col-right { width: 250px; border-left: 1px solid var(--border-color); }
+        
+        .left-top { flex: 1; border-bottom: 1px solid var(--border-color); padding: 15px; overflow-y: auto; }
+        .left-bottom { flex: 1; padding: 15px; overflow-y: auto; }
+
+        .center-top { 
+            flex: 1; 
+            position: relative; 
+            background: #000;
+            display: flex;
+            flex-direction: column;
+        }
+        .canvas-wrapper { flex: 1; position: relative; }
+        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        
+        .center-mid {
+            min-height: 40px;
+            border-top: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
+            gap: 15px;
+            background: var(--bg-panel);
+            flex-wrap: wrap;
+            font-size: 0.85rem;
+        }
+        
+        .center-bottom {
+            height: 160px;
+            display: flex;
+        }
+        
+        .control-block {
+            flex: 1;
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 10px;
+            text-align: center;
+        }
+        .control-block:last-child { border-right: none; }
+
+        .input-group {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            width: 100%;
+            margin-bottom: 5px;
+            justify-content: center;
+        }
+        .input-group input { 
+            margin-bottom: 0; 
+            width: 80px; 
+            text-align: center;
+        }
+        .input-group span { font-weight: bold; color: #aaa; }
+        
+        .big-val { font-size: 1.8rem !important; }
+
+        /* Right Column */
+        .right-top { flex: 2; border-bottom: 1px solid var(--border-color); padding: 15px; overflow-y: auto;}
+        .right-mid { flex: 2; border-bottom: 1px solid var(--border-color); padding: 15px; overflow-y: auto;}
+
+        /* === UI Elements === */
+        h3 { font-size: 0.9rem; color: #9ca3af; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px;}
+        
+        .data-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            margin-bottom: 8px;
+            color: #d1d5db;
+        }
+
+        input {
+            background: #000;
+            color: #fff;
+            border: 1px solid var(--border-color);
+            padding: 8px;
+            border-radius: 4px;
+            width: 100%;
+            margin-bottom: 10px;
+            font-size: 1rem;
+        }
+        .sm-input { padding: 4px; font-size: 0.85rem; width: 60px; margin-bottom: 0; }
+        
+        button {
+            background: #374151;
+            color: #fff;
+            border: 1px solid #4b5563;
+            padding: 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: 0.2s;
+        }
+        button:hover { background: #4b5563; }
+        
+        .btn-primary { background: var(--accent-color); border-color: var(--accent-color); color: white; }
+        .btn-primary:hover { background: #2563eb; }
+        .btn-danger { background: #ef4444; border-color: #ef4444; color: white; }
+        .btn-danger:hover { background: #dc2626; }
+        .btn-success { background: #16a34a; border-color: #16a34a; color: white; }
+        .btn-success:hover { background: #15803d; }
+
+        .graph-setting-item { display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; margin-bottom: 6px;}
+        input[type="color"] { border: none; width: 24px; height: 24px; padding: 0; background: none; cursor: pointer;}
+        
+        .status-badge {
+            background: #374151;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            margin-top: 5px;
+        }
+
+        .shortcut-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 5px;
+        }
+
+        @media (max-width: 768px) {
+            .col-left, .col-right { display: none; } /* Hide sidebars on mobile */
+            .center-bottom { height: auto; flex-wrap: wrap; }
+            .control-block { min-width: 45%; border-right: none; border-bottom: 1px solid var(--border-color); }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- LEFT SIDEBAR -->
+    <div class="panel col-left">
+        <div class="left-top">
+            <h3>Serial Connection Setting</h3>
+            <div class="data-row"><span>COM Port:</span> <span id="ui-com">None</span></div>
+            <div class="data-row" style="align-items:center;">
+                <span>Baudrate:</span> 
+                <input type="number" id="inp-baud" value="115200" class="sm-input" style="width:90px !important;">
+            </div>
+            <div class="data-row" style="align-items:center;">
+                <span>Poll (ms):</span> 
+                <input type="number" id="inp-poll" value="500" class="sm-input" style="width:90px !important;" onchange="window.app.device.updatePollRate()">
+            </div>
+            <div class="data-row"><span>Model:</span> <span id="ui-model">--</span></div>
+            <div class="data-row"><span>Firmware:</span> <span id="ui-version">--</span></div>
+            <br>
+            <button style="width: 100%; margin-bottom:5px;" onclick="window.app.comm.softRestart()">Restart Connection</button>
+            <button style="width: 100%;" onclick="window.app.device.restoreFactory()">Restore Factory</button>
+        </div>
+        <div class="left-bottom">
+            <h3>Graph Settings</h3>
+            <div class="graph-setting-item">
+                <label><input type="checkbox" id="chk-v" checked onchange="window.app.graph.cfg.showV = this.checked"> Voltage (V)</label>
+                <input type="color" id="col-v" value="#3b82f6" onchange="window.app.graph.cfg.colV = this.value">
+            </div>
+            <div class="graph-setting-item">
+                <label><input type="checkbox" id="chk-i" checked onchange="window.app.graph.cfg.showI = this.checked"> Current (A)</label>
+                <input type="color" id="col-i" value="#ef4444" onchange="window.app.graph.cfg.colI = this.value">
+            </div>
+            <div class="graph-setting-item">
+                <label><input type="checkbox" id="chk-p" checked onchange="window.app.graph.cfg.showP = this.checked"> Power (W)</label>
+                <input type="color" id="col-p" value="#10b981" onchange="window.app.graph.cfg.colP = this.value">
+            </div>
+            <div class="graph-setting-item">
+                <label><input type="checkbox" id="chk-t" onchange="window.app.graph.cfg.showT = this.checked"> Temp (°C)</label>
+                <input type="color" id="col-t" value="#eab308" onchange="window.app.graph.cfg.colT = this.value">
+            </div>
+            <div class="graph-setting-item">
+                <label><input type="checkbox" id="chk-tex" onchange="window.app.graph.cfg.showTEx = this.checked"> Ext Temp (°C)</label>
+                <input type="color" id="col-tex" value="#d946ef" onchange="window.app.graph.cfg.colTEx = this.value">
+            </div>
+            <hr style="border: 0; border-top: 1px solid #333; margin: 10px 0;">
+            <div class="graph-setting-item">
+                <label>Y-Max:</label> 
+                <div style="display:flex; align-items:center; gap: 5px;">
+                    <input type="number" id="inp-ymax" class="sm-input" value="30" oninput="window.app.graph.cfg.yMax = parseFloat(this.value) || 30; window.app.graph.cfg.autoY = false; document.getElementById('chk-autoy').checked = false;">
+                    <label style="font-size: 0.75rem;"><input type="checkbox" id="chk-autoy" onchange="window.app.graph.cfg.autoY = this.checked"> Auto</label>
+                </div>
+            </div>
+            <div class="graph-setting-item">
+                <label>Time(s):</label> <input type="number" id="inp-xpts" class="sm-input" value="100" onchange="window.app.graph.cfg.xPts = parseInt(this.value) || 100">
+            </div>
+            <button style="margin-top:10px; width: 100%;" onclick="window.app.ui.exportCSV()">Export CSV Log</button>
+        </div>
+    </div>
+
+    <!-- CENTER PANEL -->
+    <div class="panel col-mid">
+        <div class="center-top">
+            <h2 style="position:absolute; top:10px; left:20px; color:#555; z-index:10; user-select:none;">Graph Log Display</h2>
+            <div class="canvas-wrapper">
+                <canvas id="graphCanvas"></canvas>
+            </div>
+        </div>
+        
+        <div class="center-mid">
+            <div><strong>Status:</strong> <span id="ui-status" style="color:#ef4444;">Disconnected</span></div>
+            <div><strong>Tx:</strong> <span id="ui-tx">0</span> B</div>
+            <div><strong>Rx:</strong> <span id="ui-rx">0</span> B</div>
+        </div>
+
+        <div class="center-bottom">
+            <div class="control-block">
+                <h3 style="margin-bottom:15px;">Connection</h3>
+                <button id="btn-connect" class="btn-primary" style="width:80%; padding:10px;" onclick="window.app.comm.toggleConnection()">CONNECT</button>
+            </div>
+            <div class="control-block">
+                <h3>Voltage Control</h3>
+                <div class="input-group">
+                    <input type="number" id="inp-vset" step="0.01">
+                    <span>V</span>
+                </div>
+                <button style="width:100%;" onclick="window.app.device.setTargetVoltage()">SET VOLTAGE</button>
+            </div>
+            <div class="control-block">
+                <h3>Current Control</h3>
+                <div class="input-group">
+                    <input type="number" id="inp-iset" step="0.001">
+                    <span>A</span>
+                </div>
+                <button style="width:100%;" onclick="window.app.device.setTargetCurrent()">SET CURRENT</button>
+            </div>
+            <div class="control-block">
+                <h3>Output ON/OFF</h3>
+                <button id="btn-output" style="width:100%; padding: 15px; font-weight:bold; font-size:1rem;" onclick="window.app.device.toggleOutput()">OFF</button>
+            </div>
+            <div class="control-block">
+                <h3>Mode / State</h3>
+                <div id="ui-cvcc" class="status-badge" style="width:100%">CV / CC</div>
+                <div id="ui-protect" class="status-badge" style="width:100%">NORMAL</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- RIGHT SIDEBAR -->
+    <div class="panel col-right">
+        <div class="right-top">
+            <h3>Basic Info Reading</h3>
+            <div class="data-row"><span>Input Voltage:</span> <span id="ui-uin">0.00 V</span></div>
+            <br>
+            <div class="data-row"><span style="align-self:center;">Output Voltage:</span> <span id="ui-vout" class="big-val" style="color:var(--accent-color); font-weight:bold;">0.00 V</span></div>
+            <div class="data-row"><span style="align-self:center;">Output Current:</span> <span id="ui-iout" class="big-val" style="color:#ef4444; font-weight:bold;">0.000 A</span></div>
+            <div class="data-row"><span style="align-self:center;">Output Power:</span> <span id="ui-power" class="big-val" style="color:#10b981; font-weight:bold;">0.0 W</span></div>
+            <br>
+            <div class="data-row"><span>Output Capacity:</span> <span id="ui-ah">0.000 Ah</span></div>
+            <div class="data-row"><span>Output Energy:</span> <span id="ui-wh">0.000 Wh</span></div>
+            <div class="data-row"><span>Int Temp:</span> <span id="ui-tin">0.0 °C</span></div>
+            <div class="data-row"><span>Ext Temp:</span> <span id="ui-tex">0.0 °C</span></div>
+        </div>
+        <div class="right-mid">
+            <h3>Memory Shortcut</h3>
+            <div class="shortcut-grid">
+                <button id="btn-m0" onclick="window.app.device.setMemory(0)" style="grid-column: span 2;">M0</button>
+                <button id="btn-m1" onclick="window.app.device.setMemory(1)">M1</button>
+                <button id="btn-m2" onclick="window.app.device.setMemory(2)">M2</button>
+                <button id="btn-m3" onclick="window.app.device.setMemory(3)">M3</button>
+                <button id="btn-m4" onclick="window.app.device.setMemory(4)">M4</button>
+                <button id="btn-m5" onclick="window.app.device.setMemory(5)">M5</button>
+                <button id="btn-m6" onclick="window.app.device.setMemory(6)">M6</button>
+                <button id="btn-m7" onclick="window.app.device.setMemory(7)">M7</button>
+                <button id="btn-m8" onclick="window.app.device.setMemory(8)">M8</button>
+                <button id="btn-m9" onclick="window.app.device.setMemory(9)">M9</button>
+                <button id="btn-m10" onclick="window.app.device.setMemory(10)">M10</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+/**
+ * ModbusSerial
+ * Handles Web Serial API connections, auto-reconnects, CRC calculation, and the command queue.
+ * This class is device-agnostic.
+ */
+class ModbusSerial {
+    constructor(uiController) {
+        this.ui = uiController;
+        this.port = null;
+        this.reader = null;
+        this.keepReading = false;
+        this.isUserDisconnected = true;
+        this.autoReconnectInterval = null;
+        this.processInterval = null;
+        
+        this.rxBuffer = new Uint8Array();
+        this.rxBytes = 0;
+        this.txBytes = 0;
+        
+        this.cmdQueue = [];
+        this.isRequestPending = false;
+        this.requestTimeout = null;
+        this.expectedRxLength = 0;
+        this.timeoutCount = 0;
+        
+        this.onResponseCallback = null;
+
+        // Auto-reconnect listener
+        navigator.serial.addEventListener('disconnect', () => {
+            this.handleDisconnect();
+            if (!this.isUserDisconnected && !this.autoReconnectInterval) {
+                console.log("Unexpected disconnect. Starting auto-reconnect...");
+                this.autoReconnectInterval = setInterval(() => this.tryAutoReconnect(), 2000);
+            }
+        });
+
+        // Start processing queue
+        this.processInterval = setInterval(() => this.processQueue(), 50);
+    }
+
+    calculateCRC(buffer) {
+        let crc = 0xFFFF;
+        for (let pos = 0; pos < buffer.length; pos++) {
+            crc ^= buffer[pos];
+            for (let i = 8; i !== 0; i--) {
+                if ((crc & 0x0001) !== 0) {
+                    crc >>= 1; crc ^= 0xA001;
+                } else {
+                    crc >>= 1;
+                }
+            }
+        }
+        return crc;
+    }
+
+    verifyCRC(buffer) {
+        if (buffer.length < 4) return false;
+        const crc = this.calculateCRC(buffer.slice(0, -2));
+        const receivedCrc = buffer[buffer.length - 2] | (buffer[buffer.length - 1] << 8);
+        return crc === receivedCrc;
+    }
+
+    queueCommand(cmd) {
+        this.cmdQueue.push(cmd);
+    }
+
+    async processQueue() {
+        if (this.isRequestPending || this.cmdQueue.length === 0 || !this.port || !this.keepReading) return;
+        const cmd = this.cmdQueue.shift();
+        await this.sendCommand(cmd);
+    }
+
+    async sendCommand(cmd) {
+        if (!this.port || !this.port.writable) return;
+        this.isRequestPending = true;
+        
+        let frame;
+        if (cmd.type === 'read') {
+            frame = new Uint8Array(8);
+            frame[0] = 0x01; frame[1] = 0x03;
+            frame[2] = (cmd.addr >> 8) & 0xFF; frame[3] = cmd.addr & 0xFF;
+            frame[4] = (cmd.len >> 8) & 0xFF; frame[5] = cmd.len & 0xFF;
+            this.expectedRxLength = 5 + (cmd.len * 2);
+        } else if (cmd.type === 'write') {
+            frame = new Uint8Array(8);
+            frame[0] = 0x01; frame[1] = 0x06;
+            frame[2] = (cmd.addr >> 8) & 0xFF; frame[3] = cmd.addr & 0xFF;
+            frame[4] = (cmd.val >> 8) & 0xFF; frame[5] = cmd.val & 0xFF;
+            this.expectedRxLength = 8;
+        }
+
+        const crc = this.calculateCRC(frame.slice(0, 6));
+        frame[6] = crc & 0xFF; frame[7] = (crc >> 8) & 0xFF;
+
+        const writer = this.port.writable.getWriter();
+        try {
+            await writer.write(frame);
+            this.txBytes += frame.length;
+            this.ui.updateTx(this.txBytes);
+        } finally {
+            writer.releaseLock();
+        }
+
+        this.requestTimeout = setTimeout(() => {
+            this.isRequestPending = false; 
+            this.rxBuffer = new Uint8Array(); 
+            if (this.keepReading) {
+                this.timeoutCount++;
+                if (this.timeoutCount >= 3) {
+                    console.log("Device timed out. Disconnecting.");
+                    this.handleDisconnect();
+                    if (!this.isUserDisconnected && !this.autoReconnectInterval) {
+                         this.autoReconnectInterval = setInterval(() => this.tryAutoReconnect(), 2000);
+                    }
+                }
+            }
+        }, 500);
+    }
+
+    async toggleConnection() {
+        if (this.port && !this.isUserDisconnected) {
+            this.isUserDisconnected = true; 
+            this.keepReading = false;
+            if (this.reader) await this.reader.cancel(); 
+            this.handleDisconnect();
+        } else {
+            try {
+                this.port = await navigator.serial.requestPort();
+                await this.connectToPort();
+            } catch (e) { console.error("Port selection cancelled.", e); }
+        }
+    }
+
+    async connectToPort() {
+        try {
+            const baud = parseInt(document.getElementById('inp-baud').value) || 115200;
+            await this.port.open({ baudRate: baud });
+            this.isUserDisconnected = false;
+            this.keepReading = true;
+            
+            const portInfo = this.port.getInfo();
+            const portName = portInfo.usbProductId ? `PID:${portInfo.usbProductId}` : 'Serial Port';
+            this.ui.setConnectionState(true, portName);
+
+            this.startReading();
+            if (this.autoReconnectInterval) {
+                clearInterval(this.autoReconnectInterval);
+                this.autoReconnectInterval = null;
+            }
+        } catch (error) {
+            console.error("Error opening port:", error);
+            this.handleDisconnect();
+        }
+    }
+
+    async tryAutoReconnect() {
+        if (this.isUserDisconnected) return;
+        try {
+            const ports = await navigator.serial.getPorts();
+            if (ports.length > 0) {
+                this.port = ports[0];
+                await this.connectToPort();
+            }
+        } catch (e) {}
+    }
+
+    handleDisconnect() {
+        this.keepReading = false;
+        this.isRequestPending = false;
+        this.cmdQueue = [];
+        this.ui.setConnectionState(false);
+    }
+
+    async startReading() {
+        try {
+            while (this.port && this.port.readable && this.keepReading) {
+                this.reader = this.port.readable.getReader();
+                try {
+                    while (this.keepReading) {
+                        const { value, done } = await this.reader.read();
+                        if (done) break;
+                        if (value) {
+                            this.rxBytes += value.length;
+                            this.ui.updateRx(this.rxBytes);
+                            
+                            let temp = new Uint8Array(this.rxBuffer.length + value.length);
+                            temp.set(this.rxBuffer); temp.set(value, this.rxBuffer.length);
+                            this.rxBuffer = temp;
+
+                            if (this.rxBuffer.length >= this.expectedRxLength) {
+                                clearTimeout(this.requestTimeout);
+                                if (this.verifyCRC(this.rxBuffer)) {
+                                    this.timeoutCount = 0;
+                                    if (this.onResponseCallback) this.onResponseCallback(this.rxBuffer);
+                                }
+                                this.rxBuffer = new Uint8Array(); 
+                                this.isRequestPending = false;    
+                            }
+                        }
+                    }
+                } catch (e) { console.error("Read error:", e); } 
+                finally { if (this.reader) { this.reader.releaseLock(); this.reader = null; } }
+            }
+        } finally {
+            if (this.port) { try { await this.port.close(); } catch(e) {} this.port = null; }
+            if (this.isUserDisconnected) this.handleDisconnect();
+        }
+    }
+
+    softRestart() {
+        this.toggleConnection();
+        setTimeout(() => this.toggleConnection(), 1000);
+    }
+}
+
+
+/**
+ * GraphEngine
+ * Manages the HTML5 Canvas, drawing grid, axes, and history lines.
+ */
+class GraphEngine {
+    constructor(uiController) {
+        this.ui = uiController;
+        this.canvas = document.getElementById('graphCanvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.history = [];
+        this.cfg = {
+            yMax: 30, xPts: 100, autoY: false,
+            showV: true, showI: true, showP: true, showT: false, showTEx: false,
+            colV: '#3b82f6', colI: '#ef4444', colP: '#10b981', colT: '#eab308', colTEx: '#d946ef'
+        };
+        this.lastTime = Date.now();
+
+        window.addEventListener('resize', () => this.resize());
+        this.resize();
+        requestAnimationFrame(() => this.draw());
+    }
+
+    resize() {
+        const wrapper = document.querySelector('.canvas-wrapper');
+        this.canvas.width = wrapper.clientWidth;
+        this.canvas.height = wrapper.clientHeight;
+    }
+
+    addData(dataObj) {
+        dataObj.time = Date.now();
+        this.history.push(dataObj);
+        if (this.history.length > 2000) this.history.shift();
+    }
+
+    draw() {
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        const padL = 40; const padB = 25; 
+        const w = this.canvas.width - padL; const h = this.canvas.height - padB;
+        const timeWindow = (parseInt(document.getElementById('inp-xpts').value) || 100) * 1000;
+        
+        if (this.ui.isConnected) this.lastTime = Date.now();
+        
+        const now = this.lastTime;
+        const startTime = now - timeWindow;
+        const validData = this.history.filter(d => d.time >= startTime);
+        let currentYMax = this.cfg.yMax;
+        
+        if (this.cfg.autoY && validData.length > 0) {
+            let maxVal = 0.1;
+            validData.forEach(d => {
+                if (this.cfg.showV && d.v > maxVal) maxVal = d.v;
+                if (this.cfg.showI && d.i > maxVal) maxVal = d.i;
+                if (this.cfg.showP && d.p > maxVal) maxVal = d.p;
+                if (this.cfg.showT && d.t > maxVal) maxVal = d.t;
+                if (this.cfg.showTEx && d.tEx > maxVal) maxVal = d.tEx;
+            });
+            currentYMax = Math.ceil(maxVal * 1.1); 
+            document.getElementById('inp-ymax').value = currentYMax;
+        }
+
+        this.ctx.save();
+        this.ctx.translate(padL, 0);
+        
+        // Grid
+        this.ctx.strokeStyle = "#333"; this.ctx.fillStyle = "#888";
+        this.ctx.font = "10px Inter, sans-serif"; this.ctx.textAlign = "right"; this.ctx.textBaseline = "middle";
+        this.ctx.lineWidth = 1;
+        this.ctx.beginPath();
+        for(let i=0; i<=5; i++) {
+            let y = h - (i * (h/5)); let val = (currentYMax / 5) * i;
+            this.ctx.moveTo(0, y); this.ctx.lineTo(w, y);
+            if (i > 0) this.ctx.fillText(val.toFixed(1), -5, y);
+        }
+        this.ctx.stroke();
+
+        this.ctx.textAlign = "center"; this.ctx.textBaseline = "top";
+        this.ctx.beginPath();
+        for(let i=0; i<=5; i++) {
+            let x = (w / 5) * i;
+            this.ctx.moveTo(x, 0); this.ctx.lineTo(x, h);
+            let t = new Date(startTime + (timeWindow / 5) * i);
+            let timeStr = t.toLocaleTimeString('en-US', {hour12: false, hour: '2-digit', minute:'2-digit', second:'2-digit'});
+            this.ctx.fillText(timeStr, x, h + 5);
+        }
+        this.ctx.stroke();
+
+        // Data Lines
+        if (validData.length > 0) {
+            const drawLine = (key, color) => {
+                this.ctx.beginPath(); this.ctx.strokeStyle = color; this.ctx.lineWidth = 2; this.ctx.lineJoin = 'round';
+                let hasMoved = false;
+                for (let i = 0; i < validData.length; i++) {
+                    let d = validData[i];
+                    let x = ((d.time - startTime) / timeWindow) * w;
+                    let y = h - (Math.min(Math.max(d[key] / currentYMax, 0), 1) * h); 
+                    if (!hasMoved) { this.ctx.moveTo(x, y); hasMoved = true; } else this.ctx.lineTo(x, y);
+                }
+                this.ctx.stroke();
+            }
+            if (this.cfg.showV) drawLine('v', this.cfg.colV);
+            if (this.cfg.showI) drawLine('i', this.cfg.colI); 
+            if (this.cfg.showP) drawLine('p', this.cfg.colP);
+            if (this.cfg.showT) drawLine('t', this.cfg.colT);
+            if (this.cfg.showTEx) drawLine('tEx', this.cfg.colTEx);
+        }
+
+        this.ctx.restore();
+        requestAnimationFrame(() => this.draw());
+    }
+}
+
+
+/**
+ * UIController
+ * Decouples the DOM from the device logic. 
+ */
+class UIController {
+    constructor() {
+        this.isConnected = false;
+        
+        // Input Event Listeners
+        document.getElementById('inp-vset').addEventListener('keypress', (e) => { if (e.key === 'Enter') window.app.device.setTargetVoltage(); });
+        document.getElementById('inp-iset').addEventListener('keypress', (e) => { if (e.key === 'Enter') window.app.device.setTargetCurrent(); });
+        document.getElementById('inp-vset').addEventListener('change', () => window.app.device.setTargetVoltage());
+        document.getElementById('inp-iset').addEventListener('change', () => window.app.device.setTargetCurrent());
+    }
+
+    setConnectionState(isConnected, portName = "None") {
+        this.isConnected = isConnected;
+        const statusEl = document.getElementById('ui-status');
+        const btnConnect = document.getElementById('btn-connect');
+        
+        if (isConnected) {
+            statusEl.innerText = "Connected"; statusEl.style.color = "#16a34a";
+            btnConnect.innerText = "DISCONNECT"; btnConnect.className = "btn-danger";
+            document.getElementById('ui-com').innerText = portName;
+            if(window.app && window.app.device) window.app.device.startPolling();
+        } else {
+            statusEl.innerText = "Disconnected"; statusEl.style.color = "#ef4444";
+            btnConnect.innerText = "CONNECT"; btnConnect.className = "btn-primary";
+            if(window.app && window.app.device) window.app.device.stopPolling();
+        }
+    }
+
+    updateTx(bytes) { document.getElementById('ui-tx').innerText = bytes; }
+    updateRx(bytes) { document.getElementById('ui-rx').innerText = bytes; }
+
+    updateReadings(data) {
+        document.getElementById('ui-uin').innerText = data.uIn.toFixed(2) + ' V';
+        document.getElementById('ui-vout').innerText = data.vOut.toFixed(2) + ' V';
+        document.getElementById('ui-iout').innerText = data.iOut.toFixed(3) + ' A';
+        document.getElementById('ui-power').innerText = data.power.toFixed(1) + ' W';
+        document.getElementById('ui-ah').innerText = data.ah.toFixed(3) + ' Ah';
+        document.getElementById('ui-wh').innerText = data.wh.toFixed(3) + ' Wh';
+        document.getElementById('ui-tin').innerText = data.tIn.toFixed(1) + ' °C';
+        document.getElementById('ui-tex').innerText = data.tEx.toFixed(1) + ' °C';
+        
+        document.getElementById('ui-model').innerText = data.model;
+        document.getElementById('ui-version').innerText = data.version;
+
+        const btnOut = document.getElementById('btn-output');
+        if (data.outState === 1) { btnOut.innerText = "OUTPUT ON"; btnOut.className = "btn-success"; } 
+        else { btnOut.innerText = "OUTPUT OFF"; btnOut.className = ""; }
+
+        const badgeModes = ["NORMAL", "OVP", "OCP", "OPP", "LVP", "OEP", "OHP", "OTP", "OEP", "OWH", "ICP", "IVP"];
+        const protectEl = document.getElementById('ui-protect');
+        protectEl.innerText = badgeModes[data.protect] || "UNKNOWN";
+        protectEl.style.background = data.protect === 0 ? '#16a34a' : '#ef4444';
+
+        const cvccEl = document.getElementById('ui-cvcc');
+        cvccEl.innerText = data.cvcc === 0 ? 'CV MODE' : 'CC MODE';
+        cvccEl.style.background = data.cvcc === 0 ? '#3b82f6' : '#eab308';
+        
+        for (let i = 0; i <= 10; i++) {
+            let btn = document.getElementById('btn-m' + i);
+            if (btn) {
+                if (i === data.currentMem) btn.classList.add('btn-primary');
+                else btn.classList.remove('btn-primary');
+            }
+        }
+
+        // Sync inputs if user isn't typing in them
+        if (document.activeElement !== document.getElementById('inp-vset')) document.getElementById('inp-vset').value = data.vSet.toFixed(2);
+        if (document.activeElement !== document.getElementById('inp-iset')) document.getElementById('inp-iset').value = data.iSet.toFixed(3);
+    }
+
+    exportCSV() {
+        const hist = window.app.graph.history;
+        if (hist.length === 0) return alert("No graph data to export yet.");
+        let csv = "Time,Voltage(V),Current(A),Power(W),Temp(C),ExtTemp(C)\n";
+        hist.forEach(d => {
+            csv += `${new Date(d.time).toISOString()},${d.v.toFixed(2)},${d.i.toFixed(3)},${d.p.toFixed(1)},${d.t.toFixed(1)},${d.tEx.toFixed(1)}\n`;
+        });
+        const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+        const a = document.createElement('a'); a.href = url; a.download = `psu_log_${Date.now()}.csv`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+    }
+}
+
+
+/**
+ * SK150Device
+ * Device Profile for the Wuzhi SK150Pro.
+ * Contains specific register maps and parsing logic.
+ * Swap this class out to support other devices!
+ */
+class SK150Device {
+    constructor(comm, ui, graph) {
+        this.comm = comm;
+        this.ui = ui;
+        this.graph = graph;
+        this.pollingInterval = null;
+        this.lastOutputState = 0;
+        
+        // Link comm response directly to this device's parser
+        this.comm.onResponseCallback = (buffer) => this.parseResponse(buffer);
+    }
+
+    startPolling() {
+        this.stopPolling();
+        const rate = parseInt(document.getElementById('inp-poll').value) || 500;
+        this.pollingInterval = setInterval(() => {
+            if (this.comm.cmdQueue.length === 0) {
+                this.comm.queueCommand({ type: 'read', addr: 0x0000, len: 30 });
+            }
+        }, rate);
+    }
+
+    stopPolling() {
+        if (this.pollingInterval) clearInterval(this.pollingInterval);
+        this.pollingInterval = null;
+    }
+
+    updatePollRate() {
+        if (this.pollingInterval) this.startPolling();
+    }
+
+    parseResponse(buffer) {
+        if (buffer[1] === 0x03) {
+            const data = buffer.slice(3, 3 + buffer[2]);
+            const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+
+            const parsed = {
+                vSet: view.getUint16(0) / 100,
+                iSet: view.getUint16(2) / 1000,
+                vOut: view.getUint16(4) / 100,
+                iOut: view.getUint16(6) / 1000,
+                power: view.getUint16(8) / 100,
+                uIn: view.getUint16(10) / 100,
+                ah: (view.getUint16(12) | (view.getUint16(14) << 16)) / 1000,
+                wh: (view.getUint16(16) | (view.getUint16(18) << 16)) / 1000,
+                tIn: view.getUint16(26) / 10,
+                tEx: view.getUint16(28) / 10,
+                protect: view.getUint16(32),
+                cvcc: view.getUint16(34),
+                outState: view.getUint16(36),
+                model: view.getUint16(44),
+                version: view.getUint16(46),
+                currentMem: view.getUint16(58)
+            };
+
+            this.lastOutputState = parsed.outState;
+            this.ui.updateReadings(parsed);
+            this.graph.addData({ v: parsed.vOut, i: parsed.iOut, p: parsed.power, t: parsed.tIn, tEx: parsed.tEx });
+        }
+    }
+
+    // --- Device Commands ---
+    setTargetVoltage() {
+        let val = parseFloat(document.getElementById('inp-vset').value) || 0;
+        this.comm.queueCommand({ type: 'write', addr: 0x0000, val: Math.round(val * 100) });
+    }
+
+    setTargetCurrent() {
+        let val = parseFloat(document.getElementById('inp-iset').value) || 0;
+        this.comm.queueCommand({ type: 'write', addr: 0x0001, val: Math.round(val * 1000) });
+    }
+
+    toggleOutput() {
+        this.comm.queueCommand({ type: 'write', addr: 0x0012, val: this.lastOutputState === 1 ? 0 : 1 });
+    }
+
+    setMemory(bankNumber) {
+        this.comm.queueCommand({ type: 'write', addr: 0x001D, val: bankNumber });
+    }
+    
+    restoreFactory() {
+        this.comm.queueCommand({ type: 'write', addr: 0x0020, val: 1 });
+    }
+}
+
+// Bootstrap Application
+window.app = {};
+window.onload = () => {
+    window.app.ui = new UIController();
+    window.app.graph = new GraphEngine(window.app.ui);
+    window.app.comm = new ModbusSerial(window.app.ui);
+    
+    // Mount the SK150 Device. To change devices, simply write a new class 
+    // and replace this instantiation.
+    window.app.device = new SK150Device(window.app.comm, window.app.ui, window.app.graph);
+};
+
+</script>
+</body>
+</html>
